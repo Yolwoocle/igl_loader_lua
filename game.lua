@@ -25,6 +25,9 @@ function Game:init()
 	self.input_mode = "keyboard"
 	self.is_launched = false
 
+	self.stats = {}
+	self:read_files()
+
 	self.t = 0.0
 end
 
@@ -94,13 +97,21 @@ function Game:draw()
 		window:draw()
 	end
 
-	print_centered_outline("Select a game", SCREEN_XCENTER, 40, 6)
+	-- text	
+	love.graphics.setFont(FONT)
+	print_centered_outline("Sélectionnez un jeu", SCREEN_XCENTER, 40, 6)
+	draw_centered(img.btn_lr, SCREEN_XCENTER - img.btn_lr:getWidth() + 10, 150)
+	draw_centered(img.btn_mouse, SCREEN_XCENTER + img.btn_mouse:getWidth(), 150)
+	love.graphics.setFont(FONT_SM)
+	print_centered_outline("ou", SCREEN_XCENTER, 130, 4)
 	
+	-- launched	
 	if self.is_launched then
 		love.graphics.setColor(0, 0, 0, 0.8)
 		love.graphics.rectangle("fill", 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT)
 		love.graphics.setColor(1, 1, 1, 1.0)
-		print_centered_outline("Game running...", SCREEN_XCENTER, SCREEN_HEIGHT - 90, 6)
+		love.graphics.setFont(FONT_SM)
+		print_centered_outline("Partie en cours...", SCREEN_XCENTER, SCREEN_HEIGHT - 90, 6)
 	end
 end
 
@@ -149,6 +160,150 @@ end
 
 function Game:quit()
     
+end
+
+function Game:read_files()
+	self.stats = {}
+	self:read_stats_bwg()
+end
+
+function Game:read_stats_bwg()
+	local bird_stats = {
+		avg_wagon = 0,
+		
+		avg_kills = 0,
+		total_kills = 0,
+		
+		avg_time = 0,
+		total_time = 0,
+
+		n_keyboard = 0,
+		n_mouse = 0,
+		n_players = 0,
+
+		bird_choices = {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0}
+	}
+
+	local player_n = 0
+
+	local new_session = function()
+		return {
+			kills = 0,
+			time = 0,
+			timef = {},
+			wagon = 0,
+			keyboard = false,
+			bird = 1,
+			systime = {},
+		}
+	end
+	local bird_sessions = {new_session()}
+	local session_i = 1
+	for line in love.filesystem.lines("bwg_stats.txt") do
+		-- table.insert(scores, tonumber(line))
+		local pair = split(line, " ")
+		if pair ~= nil and #pair >= 2 then
+			local key, value = pair[1], pair[2]
+			self:stats_process_pair_bwg(bird_sessions[session_i], key, value)
+		end
+
+		if #line > 0 and line:sub(1, 1) == "*" then
+			session_i = session_i + 1
+			bird_sessions[session_i] = new_session()
+			player_n = player_n + 1
+		end
+	end
+	table.remove(bird_sessions)
+	print("player_n "..player_n)
+
+	-- global stats
+	for k,session in pairs(bird_sessions) do
+		bird_stats.avg_wagon = bird_stats.avg_wagon + session.wagon
+		
+		bird_stats.total_kills = bird_stats.total_kills + session.kills
+		
+		bird_stats.total_time = bird_stats.total_time + session.time
+		
+		if session.keyboard then
+			bird_stats.n_keyboard = bird_stats.n_keyboard + 1
+		else
+			bird_stats.n_mouse = bird_stats.n_mouse + 1
+		end
+		
+		bird_stats.bird_choices[session.bird] = bird_stats.bird_choices[session.bird] + 1
+	end
+	bird_stats.n_players = player_n
+	bird_stats.avg_kills = bird_stats.total_kills / bird_stats.n_players
+	bird_stats.avg_time = bird_stats.total_time / bird_stats.n_players
+
+	print_table(bird_stats)
+
+	self.stats.bird = bird_stats
+end
+
+function Game:stats_process_pair_bwg(cur_session, key, value)
+	-- kills 0
+	-- time 0:06.3
+	-- wagon 1/7
+	-- x 205.247
+	-- keyboard false
+	-- bird 117
+	-- systime 19/2_10:59:17
+	-- 
+	if key == nil or value == nil then
+		return 
+	end
+
+	if key == "kills" then
+		local n = tonumber(value:sub(1, 1))
+		if n then
+			cur_session.kills = n
+		end
+
+	elseif key == "time" then
+		local splitvals = split(value,":")
+		if splitvals and splitvals[1] and splitvals[2] then
+			local min, sec = tonumber(splitvals[1]), tonumber(splitvals[2])
+			cur_session.time = min*60 + sec
+			cur_session.timef = { min = min, sec = sec }
+		end		
+
+	elseif key == "wagon" then
+		local splitvals = split(value,"/")
+		if splitvals and splitvals[1] then
+			local wagon = tonumber(splitvals[1])
+			cur_session.wagon = cur_session.wagon + wagon - 1
+		end
+
+	elseif key == "x" then
+		local x = tonumber(value)
+		if x then
+			cur_session.wagon = cur_session.wagon + (x / (128*4))
+		end
+		
+	elseif key == "keyboard" then
+		local kb = (value == "true")
+		cur_session.keyboard = kb
+
+	elseif key == "bird" then
+		local b = tonumber(value)
+		if b then
+			cur_session.bird = b - 112 + 1
+		end
+
+	elseif key == "systime" then
+		local splitval = split(value, "_")
+		local date = split(splitval[1], "/")
+		local time = split(splitval[2], ":")
+		cur_session.systime = {
+			day = date[1],
+			month = date[2],
+
+			hour = time[1],
+			min = time[2],
+			sec = time[3],
+		}
+	end
 end
 
 return Game

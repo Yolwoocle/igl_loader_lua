@@ -22,6 +22,7 @@ function love.load(arg)
     GAME = Game:new()
 
 	FONT = love.graphics.newFont("assets/font/Lexend-ExtraBold.ttf", 64)
+	FONT_SM = love.graphics.newFont("assets/font/Lexend-ExtraBold.ttf", 24)
 	love.graphics.setFont(FONT)
 end
 

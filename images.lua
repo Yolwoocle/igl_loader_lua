@@ -13,6 +13,9 @@ local img = {
 
 	logo_bird = load_image("logo_bird.png"),
 	logo_bugs = load_image("logo_bugs.png"),
+
+	btn_lr = load_image("btn_lr.png"),
+	btn_mouse = load_image("btn_mouse.png"),
 }
 
 return img
